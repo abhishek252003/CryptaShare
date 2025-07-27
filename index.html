@@ -6,6 +6,12 @@
     <title>CryptaShare - Secure, Serverless File Sharing</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Supabase Client Library -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- QR Code Generation Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
+    <!-- QR Code Scanning Library -->
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
     <style>
         body {
             font-family: 'Inter', sans-serif;
@@ -52,13 +58,12 @@
         .tab-button:not(.active):hover {
             background-color: #2d3748;
         }
-        .tab-content {
+        .tab-content, .output-content {
             display: none;
         }
-        .tab-content.active {
+        .tab-content.active, .output-content.active {
             display: block;
         }
-        /* --- New Enhancements --- */
         .fade-in-section {
             opacity: 0;
             transform: translateY(30px);
@@ -74,9 +79,29 @@
             border-radius: 2px;
             transition: width 0.3s ease-in-out, background-color 0.3s ease-in-out;
         }
+         .qr-container {
+            background: #1a202c;
+            border-radius: 0.5rem;
+            padding: 1.5rem;
+            position: relative;
+            overflow: hidden;
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.1);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
     </style>
 </head>
 <body class="bg-zinc-900 text-gray-200">
+
+    <!-- QR Scanner Modal -->
+    <div id="qr-scanner-modal" class="fixed inset-0 bg-gray-900 bg-opacity-80 flex-col items-center justify-center z-50 hidden p-4">
+        <div class="w-full max-w-sm bg-white p-4 rounded-lg">
+            <div id="qr-reader" class="w-full"></div>
+        </div>
+        <button id="close-scanner-button" class="mt-4 bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg font-semibold">Cancel</button>
+    </div>
 
     <!-- Hero Section -->
     <section class="relative text-center py-24 md:py-32 lg:py-40 overflow-hidden hero-gradient">
@@ -88,7 +113,7 @@
                 </div>
                 <h1 class="text-4xl md:text-6xl font-extrabold text-white tracking-tighter mb-4">Share Files with Absolute Privacy.</h1>
                 <p class="text-lg md:text-xl text-gray-400 max-w-2xl mx-auto mb-8">
-                    CryptaShare encrypts your files directly in your browser before you share them. Now with AI-powered summaries for your text documents.
+                    CryptaShare encrypts your files directly in your browser. Share via a self-contained link or generate a short link with a QR code for easy mobile sharing.
                 </p>
                 <a href="#app" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg transition duration-200 text-lg">
                     Start Sharing Securely
@@ -167,24 +192,32 @@
                             </div>
                             <button id="encrypt-button" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-md transition duration-200 flex items-center justify-center gap-2">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-                                Encrypt & Create Link
+                                Encrypt File
                             </button>
                         </div>
                         <div id="encrypt-status" class="mt-4 text-center"></div>
                         <div id="encrypt-result" class="mt-4 space-y-3 hidden">
-                            <label class="block text-sm font-medium text-gray-300">Shareable Link (Self-Contained):</label>
-                            <textarea id="share-link-textarea" readonly class="w-full h-24 bg-gray-900 border border-gray-600 rounded-md p-2 text-xs text-gray-300 resize-none"></textarea>
-                            <div class="flex gap-2">
-                                <button id="copy-link-button" class="w-full bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-md transition duration-200">Copy Link</button>
-                                <button id="summarize-button" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-md transition duration-200 flex items-center justify-center gap-2">
-                                    ✨ Generate Summary
-                                </button>
+                            <div class="flex bg-gray-800 rounded-md p-1">
+                                <button id="show-link-button" class="tab-button active">Long Link</button>
+                                <button id="show-qr-button" class="tab-button">QR Code / Short Link</button>
                             </div>
-                        </div>
-                         <div id="summary-result" class="mt-4 space-y-3 hidden">
-                            <label class="block text-sm font-medium text-gray-300">Shareable Summary Link:</label>
-                            <textarea id="summary-link-textarea" readonly class="w-full h-24 bg-gray-900 border border-gray-600 rounded-md p-2 text-xs text-gray-300 resize-none"></textarea>
-                            <button id="copy-summary-link-button" class="w-full mt-2 bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-md transition duration-200">Copy Summary Link</button>
+                            <div id="link-output" class="output-content active">
+                                <label class="block text-sm font-medium text-gray-300">Shareable Link (Self-Contained):</label>
+                                <textarea id="share-link-textarea" readonly class="w-full h-24 bg-gray-900 border border-gray-600 rounded-md p-2 text-xs text-gray-300 resize-none"></textarea>
+                                <button id="copy-link-button" class="w-full mt-2 bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-md transition duration-200">Copy Link</button>
+                            </div>
+                            <div id="qr-output" class="output-content">
+                                <div class="qr-container">
+                                    <div class="bg-white p-2 rounded-md inline-block shadow-lg shadow-blue-500/20">
+                                        <canvas id="qr-canvas"></canvas>
+                                    </div>
+                                    <div id="qr-status" class="text-xs text-blue-300 mt-4 text-center"></div>
+                                    <div id="short-link-container" class="w-full mt-4 hidden">
+                                        <input type="text" id="short-link-display" readonly class="w-full bg-gray-900 border border-gray-600 rounded-md p-2 text-xs text-center text-gray-300">
+                                        <button id="copy-short-link-button" class="w-full mt-2 bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-md transition duration-200">Copy Short Link</button>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -207,7 +240,11 @@
                             </div>
                             <div id="decrypt-content-link" class="tab-content">
                                 <label for="decrypt-link-input" class="block text-sm font-medium text-gray-300 mb-1">Paste Shareable Link</label>
-                                <textarea id="decrypt-link-input" class="w-full h-24 bg-gray-800 border border-gray-600 rounded-md p-2 text-xs text-gray-300 resize-y" placeholder="Paste the long link here..."></textarea>
+                                <textarea id="decrypt-link-input" class="w-full h-24 bg-gray-800 border border-gray-600 rounded-md p-2 text-xs text-gray-300 resize-y" placeholder="Paste the long link or short link here..."></textarea>
+                                <button id="scan-qr-button" class="w-full mt-2 bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-md transition duration-200 flex items-center justify-center gap-2">
+                                   <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2"></path><path d="M17 3h2a2 2 0 0 1 2 2v2"></path><path d="M21 17v2a2 2 0 0 1-2 2h-2"></path><path d="M7 21H5a2 2 0 0 1-2-2v-2"></path><rect x="7" y="7" width="10" height="10" rx="1"></rect></svg>
+                                    Scan QR Code
+                                </button>
                             </div>
                             <div>
                                 <label for="decrypt-key" class="block text-sm font-medium text-gray-300 mb-1">Decryption Key (Password)</label>
@@ -238,50 +275,11 @@
                 </div>
                 <div class="bg-gray-800/50 p-6 rounded-lg border border-gray-700">
                     <h3 class="text-lg font-semibold text-white mb-2">Where is my file stored?</h3>
-                    <p class="text-gray-400">Nowhere! That's the key to our security model. Your encrypted file data is encoded directly into the long shareable link you create. The link itself *is* the file. We don't store it, so we can't access it, lose it, or have it stolen.</p>
+                    <p class="text-gray-400">For "Long Links", your encrypted file data is encoded directly into the link itself. For "Short Links / QR Codes", the encrypted data is stored temporarily on a secure Supabase server. In both cases, we never see your unencrypted file or your password.</p>
                 </div>
                 <div class="bg-gray-800/50 p-6 rounded-lg border border-gray-700">
                     <h3 class="text-lg font-semibold text-white mb-2">Is there a file size limit?</h3>
-                    <p class="text-gray-400">While there is no hard limit, the shareable link's length is directly proportional to the file size. For very large files (e.g., >100MB), the link can become extremely long, which may cause performance issues in some browsers. This tool is best suited for documents, images, and other reasonably sized files.</p>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Coming Soon Section -->
-    <section class="py-20 md:py-28 bg-zinc-900 fade-in-section">
-        <div class="container mx-auto px-6">
-            <div class="text-center max-w-2xl mx-auto mb-16">
-                <h2 class="text-3xl md:text-4xl font-bold text-white">On the Horizon</h2>
-                <p class="text-gray-400 mt-4">We're always working on new ways to enhance your privacy and security. Here's a sneak peek at what's coming next.</p>
-            </div>
-            <div class="grid md:grid-cols-3 gap-8 text-center">
-                <!-- Feature 1: QR Code Sharing -->
-                <div class="bg-gray-800/30 p-8 rounded-lg border border-dashed border-gray-700 opacity-60">
-                    <div class="flex items-center justify-center h-16 w-16 bg-gray-700 rounded-xl mb-6 mx-auto">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-gray-400"><path d="M3 7V5a2 2 0 0 1 2-2h2"></path><path d="M17 3h2a2 2 0 0 1 2 2v2"></path><path d="M21 17v2a2 2 0 0 1-2 2h-2"></path><path d="M7 21H5a2 2 0 0 1-2-2v-2"></path><rect x="7" y="7" width="10" height="10" rx="1"></rect></svg>
-                    </div>
-                    <h3 class="text-xl font-bold text-white mb-2">QR Code & Short Links</h3>
-                    <p class="text-gray-500">Share your encrypted files effortlessly with scannable QR codes and convenient short links.</p>
-                    <span class="inline-block mt-4 bg-yellow-500/10 text-yellow-400 text-xs font-semibold px-3 py-1 rounded-full">Coming Soon</span>
-                </div>
-                <!-- Feature 2: Self-Destructing Links -->
-                <div class="bg-gray-800/30 p-8 rounded-lg border border-dashed border-gray-700 opacity-60">
-                    <div class="flex items-center justify-center h-16 w-16 bg-gray-700 rounded-xl mb-6 mx-auto">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-gray-400"><path d="M14 11l-3-3-3 3"></path><path d="M11 8v7"></path><path d="M21 12a9 9 0 1 1-9-9"></path><path d="M21 3h-6v6"></path></svg>
-                    </div>
-                    <h3 class="text-xl font-bold text-white mb-2">Self-Destructing Links</h3>
-                    <p class="text-gray-500">Set an expiration time or a one-time download limit for your shared links for ultimate control.</p>
-                    <span class="inline-block mt-4 bg-yellow-500/10 text-yellow-400 text-xs font-semibold px-3 py-1 rounded-full">Coming Soon</span>
-                </div>
-                <!-- Feature 3: Image Watermarking -->
-                <div class="bg-gray-800/30 p-8 rounded-lg border border-dashed border-gray-700 opacity-60">
-                    <div class="flex items-center justify-center h-16 w-16 bg-gray-700 rounded-xl mb-6 mx-auto">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-gray-400"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.59a2 2 0 0 1-2.83-2.83l.79-.79"></path></svg>
-                    </div>
-                    <h3 class="text-xl font-bold text-white mb-2">Secure Watermarking</h3>
-                    <p class="text-gray-500">Add a secure, client-side watermark to your images before encrypting and sharing them.</p>
-                    <span class="inline-block mt-4 bg-yellow-500/10 text-yellow-400 text-xs font-semibold px-3 py-1 rounded-full">Coming Soon</span>
+                    <p class="text-gray-400">For "Long Links", very large files (>100MB) can create URLs that are too long for some browsers. For "Short Links", the limit is much higher and depends on the backend service's free plan (usually several hundred MB).</p>
                 </div>
             </div>
         </div>
@@ -302,12 +300,17 @@
         const encryptButton = document.getElementById('encrypt-button');
         const encryptStatus = document.getElementById('encrypt-status');
         const encryptResult = document.getElementById('encrypt-result');
+        const showLinkButton = document.getElementById('show-link-button');
+        const showQrButton = document.getElementById('show-qr-button');
+        const linkOutput = document.getElementById('link-output');
+        const qrOutput = document.getElementById('qr-output');
+        const qrCanvas = document.getElementById('qr-canvas');
+        const qrStatus = document.getElementById('qr-status');
         const shareLinkTextarea = document.getElementById('share-link-textarea');
         const copyLinkButton = document.getElementById('copy-link-button');
-        const summarizeButton = document.getElementById('summarize-button');
-        const summaryResult = document.getElementById('summary-result');
-        const summaryLinkTextarea = document.getElementById('summary-link-textarea');
-        const copySummaryLinkButton = document.getElementById('copy-summary-link-button');
+        const shortLinkContainer = document.getElementById('short-link-container');
+        const shortLinkDisplay = document.getElementById('short-link-display');
+        const copyShortLinkButton = document.getElementById('copy-short-link-button');
         const decryptTabFile = document.getElementById('decrypt-tab-file');
         const decryptTabLink = document.getElementById('decrypt-tab-link');
         const decryptContentFile = document.getElementById('decrypt-content-file');
@@ -321,11 +324,28 @@
         const decryptStatus = document.getElementById('decrypt-status');
         const passwordStrengthBar = document.getElementById('password-strength-bar');
         const passwordStrengthText = document.getElementById('password-strength-text');
+        const scanQrButton = document.getElementById('scan-qr-button');
+        const qrScannerModal = document.getElementById('qr-scanner-modal');
+        const closeScannerButton = document.getElementById('close-scanner-button');
 
         let encryptFile = null;
         let decryptFile = null;
         let currentDecryptMode = 'file';
-        let encryptedFilePayload = null; // Store the encrypted payload for summarization
+        let generatedShortLink = null;
+        let supabaseClient = null;
+        let html5QrCode;
+
+        // --- Supabase Configuration ---
+        const supabaseUrl = 'https://dbfgplgvlydlpoawgoti.supabase.co';
+        const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRiZmdwbGd2bHlkbHBvYXdnb3RpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM2NDg4NjUsImV4cCI6MjA2OTIyNDg2NX0.44_XsWIc8UVim0i87jumIqbXG0GaJ3hEs_5zrEewvdw';
+
+        if (supabaseUrl && supabaseAnonKey && window.supabase) {
+            try {
+                supabaseClient = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
+            } catch (e) {
+                console.error("Error initializing Supabase client:", e);
+            }
+        }
 
         // --- Core Crypto Functions ---
         function getKey(password, salt) {
@@ -410,27 +430,25 @@
                 passwordStrengthText.textContent = '';
                 return;
             }
-            // Award points for different criteria
             if (password.length >= 8) score++;
             if (password.length >= 12) score++;
             if (/[A-Z]/.test(password)) score++;
             if (/[0-9]/.test(password)) score++;
             if (/[^A-Za-z0-9]/.test(password)) score++;
 
-            // Update bar and text based on score
             if (score <= 2) {
                 passwordStrengthBar.style.width = '33.3%';
-                passwordStrengthBar.style.backgroundColor = '#ef4444'; // red-500
+                passwordStrengthBar.style.backgroundColor = '#ef4444';
                 passwordStrengthText.textContent = 'Weak';
                 passwordStrengthText.style.color = '#ef4444';
             } else if (score <= 4) {
                 passwordStrengthBar.style.width = '66.6%';
-                passwordStrengthBar.style.backgroundColor = '#f59e0b'; // amber-500
+                passwordStrengthBar.style.backgroundColor = '#f59e0b';
                 passwordStrengthText.textContent = 'Medium';
                 passwordStrengthText.style.color = '#f59e0b';
             } else {
                 passwordStrengthBar.style.width = '100%';
-                passwordStrengthBar.style.backgroundColor = '#22c55e'; // green-500
+                passwordStrengthBar.style.backgroundColor = '#22c55e';
                 passwordStrengthText.textContent = 'Strong';
                 passwordStrengthText.style.color = '#22c55e';
             }
@@ -468,7 +486,7 @@
             encryptFile = encryptFileInput.files[0];
             handleFileSelection(encryptFile, encryptFileText);
             encryptResult.classList.add('hidden');
-            summaryResult.classList.add('hidden');
+            generatedShortLink = null;
         });
 
         decryptFileInput.addEventListener('change', () => {
@@ -487,7 +505,7 @@
                 handleFileSelection(file, textElement);
                 if (input.id.includes('encrypt')) {
                     encryptResult.classList.add('hidden');
-                    summaryResult.classList.add('hidden');
+                    generatedShortLink = null;
                 }
             });
         }
@@ -507,7 +525,6 @@
 
             encryptButton.disabled = true;
             encryptResult.classList.add('hidden');
-            summaryResult.classList.add('hidden');
             showStatus(encryptStatus, 'Encrypting, please wait...', 'loading');
 
             try {
@@ -519,13 +536,14 @@
                 payload.set(fileNameBytes, 2);
                 payload.set(new Uint8Array(fileBuffer), 2 + fileNameBytes.length);
 
-                encryptedFilePayload = await encryptPayload(payload.buffer, encryptKeyInput.value);
-                const base64Data = arrayBufferToBase64(encryptedFilePayload);
+                const encryptedBuffer = await encryptPayload(payload.buffer, encryptKeyInput.value);
+                const base64Data = arrayBufferToBase64(encryptedBuffer);
                 const dataUrl = `data:application/octet-stream;base64,${base64Data}`;
                 
                 shareLinkTextarea.value = dataUrl;
                 encryptResult.classList.remove('hidden');
                 showStatus(encryptStatus, 'File encrypted successfully!', 'success');
+                showLinkButton.click();
             } catch (error) {
                 console.error('Encryption failed:', error);
                 showStatus(encryptStatus, 'Encryption failed. See console for details.', 'error');
@@ -537,96 +555,103 @@
         copyLinkButton.addEventListener('click', () => {
             shareLinkTextarea.select();
             document.execCommand('copy');
-            const originalText = copyLinkButton.innerHTML;
-            copyLinkButton.innerHTML = `
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mx-auto"><path d="M20 6 9 17l-5-5"></path></svg>
-                <span class="ml-2">Copied!</span>
-            `;
+            copyLinkButton.textContent = "Copied!";
             setTimeout(() => {
-                copyLinkButton.innerHTML = "Copy Link";
+                copyLinkButton.textContent = "Copy Link";
+            }, 2000);
+        });
+
+        copyShortLinkButton.addEventListener('click', () => {
+            shortLinkDisplay.select();
+            document.execCommand('copy');
+            copyShortLinkButton.textContent = "Copied!";
+            setTimeout(() => {
+                copyShortLinkButton.textContent = "Copy Short Link";
             }, 2000);
         });
         
-        // --- Gemini API Feature ---
-        summarizeButton.addEventListener('click', async () => {
-            const password = encryptKeyInput.value;
-            if (!password || !encryptedFilePayload) {
-                showStatus(encryptStatus, 'Password is required to generate summary.', 'error');
+        showLinkButton.addEventListener('click', () => {
+            showLinkButton.classList.add('active');
+            showQrButton.classList.remove('active');
+            linkOutput.classList.add('active');
+            qrOutput.classList.remove('active');
+        });
+
+        showQrButton.addEventListener('click', async () => {
+            showQrButton.classList.add('active');
+            showLinkButton.classList.remove('active');
+            qrOutput.classList.add('active');
+            linkOutput.classList.remove('active');
+
+            if (!supabaseClient) {
+                qrStatus.textContent = "Supabase not configured. Cannot create short link.";
                 return;
             }
 
-            summarizeButton.disabled = true;
-            showStatus(encryptStatus, 'Generating summary with Gemini...', 'loading');
+            if (generatedShortLink) {
+                new QRious({ element: qrCanvas, value: generatedShortLink, size: 220, level: 'M' });
+                qrStatus.textContent = "";
+                shortLinkDisplay.value = generatedShortLink;
+                shortLinkContainer.classList.remove('hidden');
+                return;
+            }
+
+            const dataUrl = shareLinkTextarea.value;
+            if (!dataUrl) return;
+
+            qrStatus.innerHTML = '<div class="spinner h-5 w-5 border-4 rounded-full inline-block mr-2"></div><span>Uploading for QR...</span>';
+            shortLinkContainer.classList.add('hidden');
 
             try {
-                // 1. Decrypt locally to get content
-                const decryptedPayload = await decryptPayload(encryptedFilePayload, password);
-                const view = new DataView(decryptedPayload);
-                const fileNameLength = view.getUint16(0, false);
-                const fileContent = decryptedPayload.slice(2 + fileNameLength);
-                const fileText = new TextDecoder().decode(fileContent);
+                const base64Data = dataUrl.split(',')[1];
+                const { data, error } = await supabaseClient
+                    .from('encrypted_files')
+                    .insert([{ data: base64Data }])
+                    .select('id');
 
-                // 2. Call Gemini API
-                const prompt = `Provide a concise, one-paragraph summary of the following text:\n\n---\n\n${fileText}`;
-                let chatHistory = [{ role: "user", parts: [{ text: prompt }] }];
-                const payload = { contents: chatHistory };
-                const apiKey = ""; // API key is handled by the environment
-                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+                if (error) throw error;
                 
-                const response = await fetch(apiUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
+                const fileId = data[0].id;
+                const link = new URL(window.location.origin + window.location.pathname);
+                link.hash = fileId;
+                generatedShortLink = link.href;
 
-                if (!response.ok) {
-                    throw new Error(`Gemini API request failed with status ${response.status}`);
-                }
-
-                const result = await response.json();
-                
-                if (result.candidates && result.candidates.length > 0) {
-                    const summaryText = result.candidates[0].content.parts[0].text;
-                    
-                    // 3. Encrypt the summary
-                    const summaryFileName = `summary_of_${encryptFile.name}.txt`;
-                    const summaryFileNameBytes = new TextEncoder().encode(summaryFileName);
-                    const summaryTextBytes = new TextEncoder().encode(summaryText);
-
-                    const summaryPayload = new Uint8Array(2 + summaryFileNameBytes.length + summaryTextBytes.length);
-                    new DataView(summaryPayload.buffer).setUint16(0, summaryFileNameBytes.length, false);
-                    summaryPayload.set(summaryFileNameBytes, 2);
-                    summaryPayload.set(summaryTextBytes, 2 + summaryFileNameBytes.length);
-                    
-                    const encryptedSummaryBuffer = await encryptPayload(summaryPayload.buffer, password);
-                    const base64SummaryData = arrayBufferToBase64(encryptedSummaryBuffer);
-                    const summaryDataUrl = `data:application/octet-stream;base64,${base64SummaryData}`;
-
-                    summaryLinkTextarea.value = summaryDataUrl;
-                    summaryResult.classList.remove('hidden');
-                    showStatus(encryptStatus, 'Summary link generated successfully!', 'success');
-                } else {
-                    throw new Error("No summary content received from Gemini API.");
-                }
+                new QRious({ element: qrCanvas, value: generatedShortLink, size: 220, level: 'M' });
+                qrStatus.textContent = "";
+                shortLinkDisplay.value = generatedShortLink;
+                shortLinkContainer.classList.remove('hidden');
 
             } catch (error) {
-                console.error('Summarization failed:', error);
-                showStatus(encryptStatus, 'Could not generate summary. See console.', 'error');
-            } finally {
-                summarizeButton.disabled = false;
+                console.error("QR Code generation/upload failed:", error);
+                if (error.code === '42501') { // RLS policy violation
+                    qrStatus.innerHTML = `
+                        <div class="text-red-400 text-xs text-left">
+                            <p class="font-bold">Permission Error:</p>
+                            <p>Your Supabase security rules are blocking new files. Please enable 'INSERT' access:</p>
+                            <ol class="list-decimal list-inside mt-2">
+                                <li>Go to your Supabase project > <b>Authentication</b> > <b>Policies</b>.</li>
+                                <li>Select the 'encrypted_files' table.</li>
+                                <li>Click <b>New Policy</b> > <b>Get started quickly</b>.</li>
+                                <li>Select <b>"Enable insert for everyone"</b> and save the policy.</li>
+                            </ol>
+                        </div>
+                    `;
+                } else if (error.code === 'PGRST204') {
+                    qrStatus.innerHTML = `
+                        <div class="text-red-400 text-xs text-left">
+                            <p class="font-bold">Database Error:</p>
+                            <p>Could not find the 'data' column. Please check two things in your Supabase project:</p>
+                            <ol class="list-decimal list-inside mt-2">
+                                <li>In the <b>Table Editor</b>, ensure your 'encrypted_files' table has a column named 'data' of type 'text'.</li>
+                                <li>Go to <b>Project Settings > API</b> and click "Reload" on the schema cache.</li>
+                            </ol>
+                        </div>
+                    `;
+                } else {
+                    qrStatus.textContent = "Error creating short link.";
+                }
             }
         });
-
-        copySummaryLinkButton.addEventListener('click', () => {
-            summaryLinkTextarea.select();
-            document.execCommand('copy');
-            const originalText = copySummaryLinkButton.textContent;
-            copySummaryLinkButton.textContent = "Copied!";
-            setTimeout(() => {
-                copySummaryLinkButton.textContent = originalText;
-            }, 2000);
-        });
-
 
         decryptTabFile.addEventListener('click', () => {
             currentDecryptMode = 'file';
@@ -666,7 +691,34 @@
                     return;
                 }
                 
-                if (link.startsWith('data:application/octet-stream;base64,')) {
+                if (link.includes('#')) {
+                    if (!supabaseClient) {
+                        showStatus(decryptStatus, "Supabase not configured. Cannot decrypt short link.", 'error');
+                        return;
+                    }
+                    const fileId = link.split('#')[1];
+                    showStatus(decryptStatus, 'Fetching short link data...', 'loading');
+                    try {
+                        const { data, error } = await supabaseClient
+                            .from('encrypted_files')
+                            .select('data')
+                            .eq('id', fileId)
+                            .single();
+                        
+                        if (error) throw error;
+
+                        if (data) {
+                            encryptedBuffer = base64ToArrayBuffer(data.data);
+                        } else {
+                            showStatus(decryptStatus, 'Error: Short link not found.', 'error');
+                            return;
+                        }
+                    } catch (e) {
+                        showStatus(decryptStatus, 'Error fetching from short link.', 'error');
+                        return;
+                    }
+                } 
+                else if (link.startsWith('data:application/octet-stream;base64,')) {
                     try {
                         const base64Data = link.split(',')[1];
                         encryptedBuffer = base64ToArrayBuffer(base64Data);
@@ -702,6 +754,49 @@
                 decryptButton.disabled = false;
             }
         });
+        
+        // Auto-fill link if present in URL
+        window.addEventListener('load', () => {
+            if (window.location.hash) {
+                decryptLinkInput.value = window.location.href;
+                decryptTabLink.click();
+            }
+        });
+
+        // --- QR Scanner Logic ---
+        scanQrButton.addEventListener('click', () => {
+            qrScannerModal.style.display = 'flex';
+            if (!html5QrCode) {
+                html5QrCode = new Html5Qrcode("qr-reader");
+            }
+            const qrCodeSuccessCallback = (decodedText, decodedResult) => {
+                stopScanner();
+                decryptLinkInput.value = decodedText;
+                showStatus(decryptStatus, 'QR Code Scanned! Enter password to decrypt.', 'success');
+            };
+            const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+            html5QrCode.start({ facingMode: "environment" }, config, qrCodeSuccessCallback)
+                .catch(err => {
+                    console.error("QR Scanner failed to start.", err);
+                    showStatus(decryptStatus, 'Could not start QR scanner.', 'error');
+                    qrScannerModal.style.display = 'none';
+                });
+        });
+
+        function stopScanner() {
+            if (html5QrCode && html5QrCode.isScanning) {
+                html5QrCode.stop().then(() => {
+                    qrScannerModal.style.display = 'none';
+                }).catch(err => {
+                    console.error("Failed to stop QR scanner.", err);
+                    qrScannerModal.style.display = 'none';
+                });
+            } else {
+                qrScannerModal.style.display = 'none';
+            }
+        }
+
+        closeScannerButton.addEventListener('click', stopScanner);
     </script>
 </body>
 </html>
