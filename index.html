@@ -3,9 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CryptaShare - Secure File Sharer</title>
+    <title>CryptaShare - Secure Sharer</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- QR Code Generation Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
+    <!-- QR Code Scanning Library -->
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
     <style>
         body {
             font-family: 'Inter', sans-serif;
@@ -48,17 +52,73 @@
         .tab-button:not(.active):hover {
             background-color: #2d3748;
         }
-        .tab-content {
+        .tab-content, .output-content {
             display: none;
         }
-        .tab-content.active {
+        .tab-content.active, .output-content.active {
             display: block;
+        }
+        #main-container.blur-sm {
+            filter: blur(4px);
+            pointer-events: none;
+        }
+        /* --- New QR Code Design --- */
+        .qr-container {
+            background: #1a202c; /* bg-gray-800 */
+            border-radius: 0.5rem;
+            padding: 1.5rem;
+            position: relative;
+            overflow: hidden;
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.1);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .corner {
+            position: absolute;
+            width: 24px;
+            height: 24px;
+            border-style: solid;
+            border-color: #3b82f6; /* blue-500 */
+        }
+        .top-left { top: -1px; left: -1px; border-width: 5px 0 0 5px; border-top-left-radius: 0.5rem; }
+        .top-right { top: -1px; right: -1px; border-width: 5px 5px 0 0; border-top-right-radius: 0.5rem; }
+        .bottom-left { bottom: -1px; left: -1px; border-width: 0 0 5px 5px; border-bottom-left-radius: 0.5rem; }
+        .bottom-right { bottom: -1px; right: -1px; border-width: 0 5px 5px 0; border-bottom-right-radius: 0.5rem; }
+
+        .scan-line {
+            position: absolute;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(to right, transparent, rgba(59, 130, 246, 0.8), transparent);
+            box-shadow: 0 0 15px rgba(59, 130, 246, 0.8);
+            animation: scan 3.5s ease-in-out infinite;
+        }
+        @keyframes scan {
+            0% { top: 0; }
+            50% { top: calc(100% - 3px); }
+            100% { top: 0; }
         }
     </style>
 </head>
 <body class="bg-gray-900 text-gray-200 flex items-center justify-center min-h-screen p-4">
 
-    <div class="w-full max-w-4xl bg-gray-800 rounded-xl shadow-2xl p-6 md:p-8">
+    <div id="loading-overlay" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex flex-col items-center justify-center z-50">
+        <div class="spinner h-12 w-12 border-4 rounded-full"></div>
+        <p id="loading-text" class="text-white text-lg mt-4">Initializing Secure Session...</p>
+    </div>
+
+    <!-- QR Scanner Modal -->
+    <div id="qr-scanner-modal" class="fixed inset-0 bg-gray-900 bg-opacity-80 flex-col items-center justify-center z-50 hidden">
+        <div class="w-full max-w-sm bg-white p-4 rounded-lg">
+            <div id="qr-reader" class="w-full"></div>
+        </div>
+        <button id="close-scanner-button" class="mt-4 bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg font-semibold">Cancel</button>
+    </div>
+
+    <div id="main-container" class="w-full max-w-4xl bg-gray-800 rounded-xl shadow-2xl p-6 md:p-8">
         <header class="text-center mb-8">
             <div class="flex items-center justify-center gap-3 mb-2">
                 <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-blue-400"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
@@ -83,27 +143,44 @@
                         </label>
                         <input type="file" id="encrypt-file-input" class="hidden">
                     </div>
-
                     <div>
                         <label for="encrypt-key" class="block text-sm font-medium text-gray-300 mb-1">Encryption Key (Password)</label>
                         <input type="password" id="encrypt-key" class="w-full bg-gray-800 border border-gray-600 rounded-md px-3 py-2 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Enter a strong password">
                     </div>
-                    
                     <div>
                         <label for="encrypt-key-confirm" class="block text-sm font-medium text-gray-300 mb-1">Confirm Key</label>
                         <input type="password" id="encrypt-key-confirm" class="w-full bg-gray-800 border border-gray-600 rounded-md px-3 py-2 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Re-enter your password">
                     </div>
-
-                    <button id="encrypt-button" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-md transition duration-200 flex items-center justify-center gap-2 disabled:bg-gray-500 disabled:cursor-not-allowed">
+                    <button id="encrypt-button" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-md transition duration-200 flex items-center justify-center gap-2">
                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
                         Encrypt File
                     </button>
                 </div>
                 <div id="encrypt-status" class="mt-4 text-center"></div>
                 <div id="encrypt-result" class="mt-4 space-y-3 hidden">
-                    <label class="block text-sm font-medium text-gray-300">Shareable Link (contains encrypted file & name):</label>
-                    <textarea id="share-link-textarea" readonly class="w-full h-24 bg-gray-900 border border-gray-600 rounded-md p-2 text-xs text-gray-300 resize-none"></textarea>
-                    <button id="copy-link-button" class="w-full bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-md transition duration-200">Copy Link</button>
+                    <div class="flex bg-gray-800 rounded-md p-1">
+                        <button id="show-link-button" class="tab-button active">Link</button>
+                        <button id="show-qr-button" class="tab-button">QR Code</button>
+                    </div>
+                    <div id="link-output" class="output-content active">
+                        <label class="block text-sm font-medium text-gray-300">Shareable Link (Self-Contained):</label>
+                        <textarea id="share-link-textarea" readonly class="w-full h-24 bg-gray-900 border border-gray-600 rounded-md p-2 text-xs text-gray-300 resize-none"></textarea>
+                        <button id="copy-link-button" class="w-full mt-2 bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-md transition duration-200">Copy Link</button>
+                    </div>
+                    <!-- Redesigned QR Code Area -->
+                    <div id="qr-output" class="output-content">
+                        <div class="qr-container">
+                            <div class="corner top-left"></div>
+                            <div class="corner top-right"></div>
+                            <div class="corner bottom-left"></div>
+                            <div class="corner bottom-right"></div>
+                            <div class="scan-line"></div>
+                            <div class="bg-white p-2 rounded-md inline-block">
+                                <canvas id="qr-canvas"></canvas>
+                            </div>
+                            <p id="qr-status" class="text-xs text-blue-300 mt-4 text-center"></p>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -113,7 +190,7 @@
                 
                 <div class="flex bg-gray-800 rounded-md p-1 mb-4">
                     <button id="decrypt-tab-file" class="tab-button active">From File</button>
-                    <button id="decrypt-tab-link" class="tab-button">From Link</button>
+                    <button id="decrypt-tab-link" class="tab-button">From Link/QR</button>
                 </div>
 
                 <div class="space-y-4">
@@ -126,18 +203,19 @@
                         </label>
                         <input type="file" id="decrypt-file-input" class="hidden">
                     </div>
-
                     <div id="decrypt-content-link" class="tab-content">
                         <label for="decrypt-link-input" class="block text-sm font-medium text-gray-300 mb-1">Paste Shareable Link</label>
-                        <textarea id="decrypt-link-input" class="w-full h-24 bg-gray-800 border border-gray-600 rounded-md p-2 text-xs text-gray-300 resize-y" placeholder="Paste the long link here..."></textarea>
+                        <textarea id="decrypt-link-input" class="w-full h-24 bg-gray-800 border border-gray-600 rounded-md p-2 text-xs text-gray-300 resize-y" placeholder="Paste the long link or short link from a QR code..."></textarea>
+                        <button id="scan-qr-button" class="w-full mt-2 bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-md transition duration-200 flex items-center justify-center gap-2">
+                           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2"></path><path d="M17 3h2a2 2 0 0 1 2 2v2"></path><path d="M21 17v2a2 2 0 0 1-2 2h-2"></path><path d="M7 21H5a2 2 0 0 1-2-2v-2"></path><rect x="7" y="7" width="10" height="10" rx="1"></rect></svg>
+                            Scan QR Code
+                        </button>
                     </div>
-
                     <div>
                         <label for="decrypt-key" class="block text-sm font-medium text-gray-300 mb-1">Decryption Key (Password)</label>
                         <input type="password" id="decrypt-key" class="w-full bg-gray-800 border border-gray-600 rounded-md px-3 py-2 text-white focus:ring-2 focus:ring-green-500 focus:border-green-500" placeholder="Enter the password">
                     </div>
-
-                    <button id="decrypt-button" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-md transition duration-200 flex items-center justify-center gap-2 disabled:bg-gray-500 disabled:cursor-not-allowed">
+                    <button id="decrypt-button" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-md transition duration-200 flex items-center justify-center gap-2">
                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 11V7a5 5 0 0 1 9.9-1"></path><path d="M10.3 21H5a2 2 0 0 1-2-2V11a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4.7"></path></svg>
                         Decrypt & Download
                     </button>
@@ -147,8 +225,15 @@
         </div>
     </div>
 
-    <script>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, addDoc, collection, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
         // --- DOM Elements ---
+        const loadingOverlay = document.getElementById('loading-overlay');
+        const loadingText = document.getElementById('loading-text');
+        const mainContainer = document.getElementById('main-container');
         const encryptFileInput = document.getElementById('encrypt-file-input');
         const encryptFileLabel = document.getElementById('encrypt-file-label');
         const encryptFileText = document.getElementById('encrypt-file-text');
@@ -157,9 +242,14 @@
         const encryptButton = document.getElementById('encrypt-button');
         const encryptStatus = document.getElementById('encrypt-status');
         const encryptResult = document.getElementById('encrypt-result');
+        const showLinkButton = document.getElementById('show-link-button');
+        const showQrButton = document.getElementById('show-qr-button');
+        const linkOutput = document.getElementById('link-output');
+        const qrOutput = document.getElementById('qr-output');
+        const qrCanvas = document.getElementById('qr-canvas');
+        const qrStatus = document.getElementById('qr-status');
         const shareLinkTextarea = document.getElementById('share-link-textarea');
         const copyLinkButton = document.getElementById('copy-link-button');
-
         const decryptTabFile = document.getElementById('decrypt-tab-file');
         const decryptTabLink = document.getElementById('decrypt-tab-link');
         const decryptContentFile = document.getElementById('decrypt-content-file');
@@ -171,10 +261,17 @@
         const decryptKeyInput = document.getElementById('decrypt-key');
         const decryptButton = document.getElementById('decrypt-button');
         const decryptStatus = document.getElementById('decrypt-status');
+        const scanQrButton = document.getElementById('scan-qr-button');
+        const qrScannerModal = document.getElementById('qr-scanner-modal');
+        const closeScannerButton = document.getElementById('close-scanner-button');
 
         let encryptFile = null;
         let decryptFile = null;
         let currentDecryptMode = 'file';
+        let generatedShortLink = null;
+        let html5QrCode;
+        
+        let db, auth;
 
         // --- Core Crypto Functions ---
         function getKey(password, salt) {
@@ -183,7 +280,7 @@
                 .then(baseKey => window.crypto.subtle.deriveKey({ name: 'PBKDF2', salt, iterations: 100000, hash: 'SHA-256' }, baseKey, { name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']));
         }
 
-        async function encryptData(data, password) {
+        async function encryptPayload(data, password) {
             const salt = window.crypto.getRandomValues(new Uint8Array(16));
             const iv = window.crypto.getRandomValues(new Uint8Array(12));
             const key = await getKey(password, salt);
@@ -195,7 +292,7 @@
             return result.buffer;
         }
 
-        async function decryptData(data, password) {
+        async function decryptPayload(data, password) {
             const dataBytes = new Uint8Array(data);
             const salt = dataBytes.slice(0, 16);
             const iv = dataBytes.slice(16, 28);
@@ -266,6 +363,7 @@
             encryptFile = encryptFileInput.files[0];
             handleFileSelection(encryptFile, encryptFileText);
             encryptResult.classList.add('hidden');
+            generatedShortLink = null;
         });
 
         decryptFileInput.addEventListener('change', () => {
@@ -282,7 +380,10 @@
                 const file = input.files[0];
                 fileVarSetter(file);
                 handleFileSelection(file, textElement);
-                if (input.id.includes('encrypt')) encryptResult.classList.add('hidden');
+                if (input.id.includes('encrypt')) {
+                    encryptResult.classList.add('hidden');
+                    generatedShortLink = null;
+                }
             });
         }
 
@@ -304,25 +405,22 @@
             showStatus(encryptStatus, 'Encrypting, please wait...', 'loading');
 
             try {
-                // *** NEW: Combine filename and file content into a single payload ***
                 const fileNameBytes = new TextEncoder().encode(encryptFile.name);
                 const fileBuffer = await readFileAsArrayBuffer(encryptFile);
                 
-                // Payload format: [2-byte file name length][file name][file content]
                 const payload = new Uint8Array(2 + fileNameBytes.length + fileBuffer.byteLength);
-                new DataView(payload.buffer).setUint16(0, fileNameBytes.length, false); // false for big-endian
+                new DataView(payload.buffer).setUint16(0, fileNameBytes.length, false);
                 payload.set(fileNameBytes, 2);
                 payload.set(new Uint8Array(fileBuffer), 2 + fileNameBytes.length);
 
-                // Encrypt the entire payload
-                const encryptedBuffer = await encryptData(payload.buffer, encryptKeyInput.value);
-                
+                const encryptedBuffer = await encryptPayload(payload.buffer, encryptKeyInput.value);
                 const base64Data = arrayBufferToBase64(encryptedBuffer);
                 const dataUrl = `data:application/octet-stream;base64,${base64Data}`;
                 
                 shareLinkTextarea.value = dataUrl;
                 encryptResult.classList.remove('hidden');
                 showStatus(encryptStatus, 'File encrypted successfully!', 'success');
+                showLinkButton.click();
             } catch (error) {
                 console.error('Encryption failed:', error);
                 showStatus(encryptStatus, 'Encryption failed. See console for details.', 'error');
@@ -337,7 +435,52 @@
             showStatus(encryptStatus, 'Link copied to clipboard!', 'success');
         });
         
-        // Decrypt Tab Switching
+        showLinkButton.addEventListener('click', () => {
+            showLinkButton.classList.add('active');
+            showQrButton.classList.remove('active');
+            linkOutput.classList.add('active');
+            qrOutput.classList.remove('active');
+        });
+
+        showQrButton.addEventListener('click', async () => {
+            showQrButton.classList.add('active');
+            showLinkButton.classList.remove('active');
+            qrOutput.classList.add('active');
+            linkOutput.classList.remove('active');
+
+            if (generatedShortLink) {
+                new QRious({ element: qrCanvas, value: generatedShortLink, size: 256, level: 'M' });
+                qrStatus.textContent = "Scan the QR code to share the short link.";
+                return;
+            }
+
+            const dataUrl = shareLinkTextarea.value;
+            if (!dataUrl) return;
+
+            qrStatus.innerHTML = '<div class="spinner h-5 w-5 border-4 rounded-full inline-block mr-2"></div><span>Uploading for QR...</span>';
+
+            try {
+                const base64Data = dataUrl.split(',')[1];
+                const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+                const filesCollection = collection(db, `/artifacts/${appId}/public/data/files`);
+                const docRef = await addDoc(filesCollection, {
+                    createdAt: new Date(),
+                    data: base64Data
+                });
+                
+                const link = new URL(window.location.origin + window.location.pathname);
+                link.hash = docRef.id;
+                generatedShortLink = link.href;
+
+                new QRious({ element: qrCanvas, value: generatedShortLink, size: 256, level: 'M' });
+                qrStatus.textContent = "Scan the QR code to share the short link.";
+
+            } catch (error) {
+                console.error("QR Code generation/upload failed:", error);
+                qrStatus.textContent = "Error creating QR code.";
+            }
+        });
+
         decryptTabFile.addEventListener('click', () => {
             currentDecryptMode = 'file';
             decryptTabFile.classList.add('active');
@@ -369,21 +512,42 @@
                     return;
                 }
                 encryptedBuffer = await readFileAsArrayBuffer(decryptFile);
-            } else { // mode is 'link'
+            } else {
                 const link = decryptLinkInput.value;
                 if (!link) {
                     showStatus(decryptStatus, 'Please paste a shareable link.', 'error');
                     return;
                 }
-                if (!link.startsWith('data:application/octet-stream;base64,')) {
+                
+                if (link.includes('#')) {
+                    const fileId = link.split('#')[1];
+                    showStatus(decryptStatus, 'Fetching short link data...', 'loading');
+                    try {
+                        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+                        const docRef = doc(db, `/artifacts/${appId}/public/data/files`, fileId);
+                        const docSnap = await getDoc(docRef);
+                        if (docSnap.exists()) {
+                            const base64Data = docSnap.data().data;
+                            encryptedBuffer = base64ToArrayBuffer(base64Data);
+                        } else {
+                            showStatus(decryptStatus, 'Error: Short link not found.', 'error');
+                            return;
+                        }
+                    } catch (e) {
+                        showStatus(decryptStatus, 'Error fetching from short link.', 'error');
+                        return;
+                    }
+                } 
+                else if (link.startsWith('data:application/octet-stream;base64,')) {
+                    try {
+                        const base64Data = link.split(',')[1];
+                        encryptedBuffer = base64ToArrayBuffer(base64Data);
+                    } catch (e) {
+                        showStatus(decryptStatus, 'Invalid link data. Could not decode.', 'error');
+                        return;
+                    }
+                } else {
                     showStatus(decryptStatus, 'Invalid link format.', 'error');
-                    return;
-                }
-                try {
-                    const base64Data = link.split(',')[1];
-                    encryptedBuffer = base64ToArrayBuffer(base64Data);
-                } catch (e) {
-                    showStatus(decryptStatus, 'Invalid link data. Could not decode.', 'error');
                     return;
                 }
             }
@@ -392,18 +556,13 @@
             showStatus(decryptStatus, 'Decrypting, please wait...', 'loading');
 
             try {
-                // Decrypt the entire payload
-                const decryptedPayload = await decryptData(encryptedBuffer, password);
-
-                // *** NEW: Parse the decrypted payload to extract filename and content ***
+                const decryptedPayload = await decryptPayload(encryptedBuffer, password);
                 const view = new DataView(decryptedPayload);
-                const fileNameLength = view.getUint16(0, false); // false for big-endian
+                const fileNameLength = view.getUint16(0, false);
                 const fileNameBytes = new Uint8Array(decryptedPayload, 2, fileNameLength);
                 const originalFileName = new TextDecoder().decode(fileNameBytes);
-                
                 const fileContent = decryptedPayload.slice(2 + fileNameLength);
 
-                // Create blob from the actual file content and download with the correct name
                 const blob = new Blob([fileContent]);
                 downloadBlob(blob, originalFileName);
                 showStatus(decryptStatus, 'File decrypted and download started!', 'success');
@@ -415,6 +574,76 @@
                 decryptButton.disabled = false;
             }
         });
+
+        // --- QR Scanner Logic ---
+        scanQrButton.addEventListener('click', () => {
+            qrScannerModal.style.display = 'flex';
+            if (!html5QrCode) {
+                html5QrCode = new Html5Qrcode("qr-reader");
+            }
+            const qrCodeSuccessCallback = (decodedText, decodedResult) => {
+                stopScanner();
+                decryptLinkInput.value = decodedText;
+                showStatus(decryptStatus, 'QR Code Scanned! Enter password to decrypt.', 'success');
+            };
+            const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+            html5QrCode.start({ facingMode: "environment" }, config, qrCodeSuccessCallback)
+                .catch(err => {
+                    console.error("QR Scanner failed to start.", err);
+                    showStatus(decryptStatus, 'Could not start QR scanner.', 'error');
+                    qrScannerModal.style.display = 'none';
+                });
+        });
+
+        function stopScanner() {
+            if (html5QrCode && html5QrCode.isScanning) {
+                html5QrCode.stop().then(() => {
+                    qrScannerModal.style.display = 'none';
+                }).catch(err => {
+                    console.error("Failed to stop QR scanner.", err);
+                    qrScannerModal.style.display = 'none';
+                });
+            } else {
+                qrScannerModal.style.display = 'none';
+            }
+        }
+
+        closeScannerButton.addEventListener('click', stopScanner);
+
+        // --- App Initialization ---
+        async function init() {
+            try {
+                const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+                if (!firebaseConfig) {
+                    loadingText.textContent = 'Firebase config not found. App cannot start.';
+                    return;
+                }
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                setLogLevel('error');
+
+                loadingText.textContent = 'Authenticating...';
+                const token = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+                if (token) { await signInWithCustomToken(auth, token); } else { await signInAnonymously(auth); }
+                
+                const fileId = window.location.hash.substring(1);
+                if (fileId) {
+                    decryptLinkInput.value = window.location.href;
+                    decryptTabLink.click();
+                }
+
+                loadingOverlay.classList.add('hidden');
+                mainContainer.classList.remove('blur-sm');
+
+            } catch (error) {
+                console.error("Initialization failed:", error);
+                loadingText.textContent = 'Initialization Failed. Check console.';
+            }
+        }
+        
+        window.onload = init;
+
     </script>
 </body>
 </html>
