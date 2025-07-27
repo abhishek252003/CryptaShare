@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CryptaShare - Secure File Sharer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .file-input-label {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            border: 2px dashed #4a5568;
+            border-radius: 0.5rem;
+            padding: 2rem;
+            transition: all 0.2s ease-in-out;
+        }
+        .file-input-label:hover {
+            border-color: #718096;
+            background-color: #2d3748;
+        }
+        .file-input-label.dragover {
+            border-color: #4299e1;
+            background-color: #2c5282;
+        }
+        .spinner {
+            border-top-color: #4299e1;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .tab-button {
+            flex: 1;
+            padding: 0.75rem;
+            border-radius: 0.375rem;
+            font-weight: 500;
+            transition: background-color 0.2s;
+        }
+        .tab-button.active {
+            background-color: #4a5568;
+        }
+        .tab-button:not(.active):hover {
+            background-color: #2d3748;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-200 flex items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-4xl bg-gray-800 rounded-xl shadow-2xl p-6 md:p-8">
+        <header class="text-center mb-8">
+            <div class="flex items-center justify-center gap-3 mb-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-blue-400"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+                <h1 class="text-3xl md:text-4xl font-bold text-white">CryptaShare</h1>
+            </div>
+            <p class="text-gray-400">Securely encrypt and decrypt files directly in your browser.</p>
+        </header>
+
+        <div class="grid md:grid-cols-2 gap-8">
+
+            <!-- Encryption Section -->
+            <div id="encrypt-card" class="bg-gray-700/50 p-6 rounded-lg border border-gray-700">
+                <h2 class="text-2xl font-semibold mb-4 text-center text-blue-300">Encrypt File</h2>
+                
+                <div class="space-y-4">
+                    <div>
+                        <label for="encrypt-file-input" id="encrypt-file-label" class="file-input-label">
+                            <div class="text-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mx-auto mb-2 text-gray-500"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                                <span id="encrypt-file-text" class="text-gray-400">Click or drag file to upload</span>
+                            </div>
+                        </label>
+                        <input type="file" id="encrypt-file-input" class="hidden">
+                    </div>
+
+                    <div>
+                        <label for="encrypt-key" class="block text-sm font-medium text-gray-300 mb-1">Encryption Key (Password)</label>
+                        <input type="password" id="encrypt-key" class="w-full bg-gray-800 border border-gray-600 rounded-md px-3 py-2 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Enter a strong password">
+                    </div>
+                    
+                    <div>
+                        <label for="encrypt-key-confirm" class="block text-sm font-medium text-gray-300 mb-1">Confirm Key</label>
+                        <input type="password" id="encrypt-key-confirm" class="w-full bg-gray-800 border border-gray-600 rounded-md px-3 py-2 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Re-enter your password">
+                    </div>
+
+                    <button id="encrypt-button" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-md transition duration-200 flex items-center justify-center gap-2 disabled:bg-gray-500 disabled:cursor-not-allowed">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                        Encrypt File
+                    </button>
+                </div>
+                <div id="encrypt-status" class="mt-4 text-center"></div>
+                <div id="encrypt-result" class="mt-4 space-y-3 hidden">
+                    <label class="block text-sm font-medium text-gray-300">Shareable Link (contains encrypted file & name):</label>
+                    <textarea id="share-link-textarea" readonly class="w-full h-24 bg-gray-900 border border-gray-600 rounded-md p-2 text-xs text-gray-300 resize-none"></textarea>
+                    <button id="copy-link-button" class="w-full bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-md transition duration-200">Copy Link</button>
+                </div>
+            </div>
+
+            <!-- Decryption Section -->
+            <div id="decrypt-card" class="bg-gray-700/50 p-6 rounded-lg border border-gray-700">
+                <h2 class="text-2xl font-semibold mb-4 text-center text-green-300">Decrypt File</h2>
+                
+                <div class="flex bg-gray-800 rounded-md p-1 mb-4">
+                    <button id="decrypt-tab-file" class="tab-button active">From File</button>
+                    <button id="decrypt-tab-link" class="tab-button">From Link</button>
+                </div>
+
+                <div class="space-y-4">
+                    <div id="decrypt-content-file" class="tab-content active">
+                        <label for="decrypt-file-input" id="decrypt-file-label" class="file-input-label">
+                            <div class="text-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mx-auto mb-2 text-gray-500"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                                <span id="decrypt-file-text" class="text-gray-400">Click or drag encrypted file</span>
+                            </div>
+                        </label>
+                        <input type="file" id="decrypt-file-input" class="hidden">
+                    </div>
+
+                    <div id="decrypt-content-link" class="tab-content">
+                        <label for="decrypt-link-input" class="block text-sm font-medium text-gray-300 mb-1">Paste Shareable Link</label>
+                        <textarea id="decrypt-link-input" class="w-full h-24 bg-gray-800 border border-gray-600 rounded-md p-2 text-xs text-gray-300 resize-y" placeholder="Paste the long link here..."></textarea>
+                    </div>
+
+                    <div>
+                        <label for="decrypt-key" class="block text-sm font-medium text-gray-300 mb-1">Decryption Key (Password)</label>
+                        <input type="password" id="decrypt-key" class="w-full bg-gray-800 border border-gray-600 rounded-md px-3 py-2 text-white focus:ring-2 focus:ring-green-500 focus:border-green-500" placeholder="Enter the password">
+                    </div>
+
+                    <button id="decrypt-button" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-md transition duration-200 flex items-center justify-center gap-2 disabled:bg-gray-500 disabled:cursor-not-allowed">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 11V7a5 5 0 0 1 9.9-1"></path><path d="M10.3 21H5a2 2 0 0 1-2-2V11a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4.7"></path></svg>
+                        Decrypt & Download
+                    </button>
+                </div>
+                <div id="decrypt-status" class="mt-4 text-center"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- DOM Elements ---
+        const encryptFileInput = document.getElementById('encrypt-file-input');
+        const encryptFileLabel = document.getElementById('encrypt-file-label');
+        const encryptFileText = document.getElementById('encrypt-file-text');
+        const encryptKeyInput = document.getElementById('encrypt-key');
+        const encryptKeyConfirmInput = document.getElementById('encrypt-key-confirm');
+        const encryptButton = document.getElementById('encrypt-button');
+        const encryptStatus = document.getElementById('encrypt-status');
+        const encryptResult = document.getElementById('encrypt-result');
+        const shareLinkTextarea = document.getElementById('share-link-textarea');
+        const copyLinkButton = document.getElementById('copy-link-button');
+
+        const decryptTabFile = document.getElementById('decrypt-tab-file');
+        const decryptTabLink = document.getElementById('decrypt-tab-link');
+        const decryptContentFile = document.getElementById('decrypt-content-file');
+        const decryptContentLink = document.getElementById('decrypt-content-link');
+        const decryptFileInput = document.getElementById('decrypt-file-input');
+        const decryptFileLabel = document.getElementById('decrypt-file-label');
+        const decryptFileText = document.getElementById('decrypt-file-text');
+        const decryptLinkInput = document.getElementById('decrypt-link-input');
+        const decryptKeyInput = document.getElementById('decrypt-key');
+        const decryptButton = document.getElementById('decrypt-button');
+        const decryptStatus = document.getElementById('decrypt-status');
+
+        let encryptFile = null;
+        let decryptFile = null;
+        let currentDecryptMode = 'file';
+
+        // --- Core Crypto Functions ---
+        function getKey(password, salt) {
+            const enc = new TextEncoder();
+            return window.crypto.subtle.importKey('raw', enc.encode(password), { name: 'PBKDF2' }, false, ['deriveKey'])
+                .then(baseKey => window.crypto.subtle.deriveKey({ name: 'PBKDF2', salt, iterations: 100000, hash: 'SHA-256' }, baseKey, { name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']));
+        }
+
+        async function encryptData(data, password) {
+            const salt = window.crypto.getRandomValues(new Uint8Array(16));
+            const iv = window.crypto.getRandomValues(new Uint8Array(12));
+            const key = await getKey(password, salt);
+            const encryptedContent = await window.crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, data);
+            const result = new Uint8Array(salt.length + iv.length + encryptedContent.byteLength);
+            result.set(salt, 0);
+            result.set(iv, salt.length);
+            result.set(new Uint8Array(encryptedContent), salt.length + iv.length);
+            return result.buffer;
+        }
+
+        async function decryptData(data, password) {
+            const dataBytes = new Uint8Array(data);
+            const salt = dataBytes.slice(0, 16);
+            const iv = dataBytes.slice(16, 28);
+            const encryptedContent = dataBytes.slice(28);
+            const key = await getKey(password, salt);
+            return await window.crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, encryptedContent);
+        }
+
+        // --- Utility Functions ---
+        function readFileAsArrayBuffer(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = () => reject(reader.error);
+                reader.readAsArrayBuffer(file);
+            });
+        }
+
+        function downloadBlob(blob, fileName) {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function arrayBufferToBase64(buffer) {
+            let binary = '';
+            const bytes = new Uint8Array(buffer);
+            for (let i = 0; i < bytes.byteLength; i++) {
+                binary += String.fromCharCode(bytes[i]);
+            }
+            return window.btoa(binary);
+        }
+        
+        function base64ToArrayBuffer(base64) {
+            const binary_string = window.atob(base64);
+            const bytes = new Uint8Array(binary_string.length);
+            for (let i = 0; i < binary_string.length; i++) {
+                bytes[i] = binary_string.charCodeAt(i);
+            }
+            return bytes.buffer;
+        }
+
+        function showStatus(element, message, type) {
+            let colorClass = 'text-gray-400';
+            if (type === 'success') colorClass = 'text-green-400';
+            if (type === 'error') colorClass = 'text-red-400';
+            let spinner = type === 'loading' ? `<div class="spinner h-5 w-5 border-4 rounded-full inline-block mr-2"></div>` : '';
+            element.innerHTML = `<div class="flex items-center justify-center ${colorClass}">${spinner}<span>${message}</span></div>`;
+        }
+        
+        // --- Event Listeners ---
+        function handleFileSelection(file, textElement) {
+             if (file) {
+                textElement.textContent = file.name;
+                textElement.classList.add('text-white');
+            } else {
+                textElement.textContent = textElement.id.includes('encrypt') ? 'Click or drag file to upload' : 'Click or drag file to decrypt';
+                textElement.classList.remove('text-white');
+            }
+        }
+
+        encryptFileInput.addEventListener('change', () => {
+            encryptFile = encryptFileInput.files[0];
+            handleFileSelection(encryptFile, encryptFileText);
+            encryptResult.classList.add('hidden');
+        });
+
+        decryptFileInput.addEventListener('change', () => {
+            decryptFile = decryptFileInput.files[0];
+            handleFileSelection(decryptFile, decryptFileText);
+        });
+
+        function setupDragDrop(label, input, fileVarSetter, textElement) {
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(ev => label.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation(); }));
+            ['dragenter', 'dragover'].forEach(ev => label.addEventListener(ev, () => label.classList.add('dragover')));
+            ['dragleave', 'drop'].forEach(ev => label.addEventListener(ev, () => label.classList.remove('dragover')));
+            label.addEventListener('drop', e => {
+                input.files = e.dataTransfer.files;
+                const file = input.files[0];
+                fileVarSetter(file);
+                handleFileSelection(file, textElement);
+                if (input.id.includes('encrypt')) encryptResult.classList.add('hidden');
+            });
+        }
+
+        setupDragDrop(encryptFileLabel, encryptFileInput, f => encryptFile = f, encryptFileText);
+        setupDragDrop(decryptFileLabel, decryptFileInput, f => decryptFile = f, decryptFileText);
+
+        encryptButton.addEventListener('click', async () => {
+            if (!encryptFile || !encryptKeyInput.value) {
+                showStatus(encryptStatus, 'Please select a file and enter a key.', 'error');
+                return;
+            }
+            if (encryptKeyInput.value !== encryptKeyConfirmInput.value) {
+                showStatus(encryptStatus, 'Passwords do not match. Please try again.', 'error');
+                return;
+            }
+
+            encryptButton.disabled = true;
+            encryptResult.classList.add('hidden');
+            showStatus(encryptStatus, 'Encrypting, please wait...', 'loading');
+
+            try {
+                // *** NEW: Combine filename and file content into a single payload ***
+                const fileNameBytes = new TextEncoder().encode(encryptFile.name);
+                const fileBuffer = await readFileAsArrayBuffer(encryptFile);
+                
+                // Payload format: [2-byte file name length][file name][file content]
+                const payload = new Uint8Array(2 + fileNameBytes.length + fileBuffer.byteLength);
+                new DataView(payload.buffer).setUint16(0, fileNameBytes.length, false); // false for big-endian
+                payload.set(fileNameBytes, 2);
+                payload.set(new Uint8Array(fileBuffer), 2 + fileNameBytes.length);
+
+                // Encrypt the entire payload
+                const encryptedBuffer = await encryptData(payload.buffer, encryptKeyInput.value);
+                
+                const base64Data = arrayBufferToBase64(encryptedBuffer);
+                const dataUrl = `data:application/octet-stream;base64,${base64Data}`;
+                
+                shareLinkTextarea.value = dataUrl;
+                encryptResult.classList.remove('hidden');
+                showStatus(encryptStatus, 'File encrypted successfully!', 'success');
+            } catch (error) {
+                console.error('Encryption failed:', error);
+                showStatus(encryptStatus, 'Encryption failed. See console for details.', 'error');
+            } finally {
+                encryptButton.disabled = false;
+            }
+        });
+
+        copyLinkButton.addEventListener('click', () => {
+            shareLinkTextarea.select();
+            document.execCommand('copy');
+            showStatus(encryptStatus, 'Link copied to clipboard!', 'success');
+        });
+        
+        // Decrypt Tab Switching
+        decryptTabFile.addEventListener('click', () => {
+            currentDecryptMode = 'file';
+            decryptTabFile.classList.add('active');
+            decryptTabLink.classList.remove('active');
+            decryptContentFile.classList.add('active');
+            decryptContentLink.classList.remove('active');
+        });
+
+        decryptTabLink.addEventListener('click', () => {
+            currentDecryptMode = 'link';
+            decryptTabLink.classList.add('active');
+            decryptTabFile.classList.remove('active');
+            decryptContentLink.classList.add('active');
+            decryptContentFile.classList.remove('active');
+        });
+
+        decryptButton.addEventListener('click', async () => {
+            const password = decryptKeyInput.value;
+            if (!password) {
+                showStatus(decryptStatus, 'Please enter the decryption key.', 'error');
+                return;
+            }
+
+            let encryptedBuffer;
+
+            if (currentDecryptMode === 'file') {
+                if (!decryptFile) {
+                    showStatus(decryptStatus, 'Please select a file to decrypt.', 'error');
+                    return;
+                }
+                encryptedBuffer = await readFileAsArrayBuffer(decryptFile);
+            } else { // mode is 'link'
+                const link = decryptLinkInput.value;
+                if (!link) {
+                    showStatus(decryptStatus, 'Please paste a shareable link.', 'error');
+                    return;
+                }
+                if (!link.startsWith('data:application/octet-stream;base64,')) {
+                    showStatus(decryptStatus, 'Invalid link format.', 'error');
+                    return;
+                }
+                try {
+                    const base64Data = link.split(',')[1];
+                    encryptedBuffer = base64ToArrayBuffer(base64Data);
+                } catch (e) {
+                    showStatus(decryptStatus, 'Invalid link data. Could not decode.', 'error');
+                    return;
+                }
+            }
+
+            decryptButton.disabled = true;
+            showStatus(decryptStatus, 'Decrypting, please wait...', 'loading');
+
+            try {
+                // Decrypt the entire payload
+                const decryptedPayload = await decryptData(encryptedBuffer, password);
+
+                // *** NEW: Parse the decrypted payload to extract filename and content ***
+                const view = new DataView(decryptedPayload);
+                const fileNameLength = view.getUint16(0, false); // false for big-endian
+                const fileNameBytes = new Uint8Array(decryptedPayload, 2, fileNameLength);
+                const originalFileName = new TextDecoder().decode(fileNameBytes);
+                
+                const fileContent = decryptedPayload.slice(2 + fileNameLength);
+
+                // Create blob from the actual file content and download with the correct name
+                const blob = new Blob([fileContent]);
+                downloadBlob(blob, originalFileName);
+                showStatus(decryptStatus, 'File decrypted and download started!', 'success');
+
+            } catch (error) {
+                console.error('Decryption failed:', error);
+                showStatus(decryptStatus, 'Decryption failed. Incorrect password or corrupted data.', 'error');
+            } finally {
+                decryptButton.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>
