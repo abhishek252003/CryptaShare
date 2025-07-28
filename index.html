@@ -79,28 +79,181 @@
             border-radius: 2px;
             transition: width 0.3s ease-in-out, background-color 0.3s ease-in-out;
         }
-         .qr-container {
-            background: #1a202c;
-            border-radius: 0.5rem;
+        /* Styles for interactive FAQ */
+        .faq-answer {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.4s ease-in-out;
+        }
+        .faq-answer.is-open {
+            max-height: 200px; /* Adjust if your content is taller */
+        }
+        .faq-icon {
+            transition: transform 0.3s ease-in-out;
+        }
+        .faq-icon.is-open {
+            transform: rotate(180deg);
+        }
+
+        /* --- Futuristic QR Generator --- */
+        .futuristic-qr-container {
+            background: #0d1117; /* Darker bg */
+            border-radius: 0.75rem;
             padding: 1.5rem;
             position: relative;
             overflow: hidden;
-            border: 1px solid rgba(59, 130, 246, 0.3);
-            box-shadow: 0 0 20px rgba(59, 130, 246, 0.1);
+            border: 1px solid rgba(59, 130, 146, 0.2);
+            box-shadow: 0 0 30px rgba(59, 130, 246, 0.15);
             display: flex;
             flex-direction: column;
             align-items: center;
         }
+
+        .futuristic-qr-container::before,
+        .futuristic-qr-container::after {
+            content: '';
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            border-color: #3b82f6;
+            border-style: solid;
+            animation: pulse-glow 2s infinite alternate;
+        }
+
+        .futuristic-qr-container::before {
+            top: 1rem;
+            left: 1rem;
+            border-width: 3px 0 0 3px;
+            border-top-left-radius: 0.5rem;
+        }
+
+        .futuristic-qr-container::after {
+            bottom: 1rem;
+            right: 1rem;
+            border-width: 0 3px 3px 0;
+            border-bottom-right-radius: 0.5rem;
+        }
+
+        .qr-canvas-wrapper {
+            position: relative;
+            padding: 0.5rem;
+            background: white;
+            border-radius: 0.5rem;
+            box-shadow: 0 0 25px rgba(255, 255, 255, 0.5);
+        }
+
+        .qr-canvas-wrapper::before,
+        .qr-canvas-wrapper::after {
+            content: '';
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            border-color: #3b82f6;
+            border-style: solid;
+            animation: pulse-glow 2s infinite alternate-reverse;
+        }
+
+        .qr-canvas-wrapper::before {
+            bottom: 1rem;
+            left: 1rem;
+            border-width: 0 0 3px 3px;
+            border-bottom-left-radius: 0.5rem;
+        }
+
+        .qr-canvas-wrapper::after {
+            top: 1rem;
+            right: 1rem;
+            border-width: 3px 3px 0 0;
+            border-top-right-radius: 0.5rem;
+        }
+
+        @keyframes pulse-glow {
+            from {
+                border-color: #3b82f6;
+                box-shadow: 0 0 5px #3b82f6;
+            }
+            to {
+                border-color: #93c5fd;
+                box-shadow: 0 0 15px #3b82f6;
+            }
+        }
+
+        /* --- Futuristic QR Scanner --- */
+        .scanner-container {
+            position: relative;
+            width: 330px;
+            /* padding-top: 100%; 1:1 Aspect Ratio */
+            height:250px;
+            overflow: hidden;
+            border-radius: 0.5rem;
+            background: #112;
+        }
+
+        #qr-reader {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .scanner-overlay {
+            position: absolute;
+            inset: 0;
+            z-index: 10;
+        }
+
+        .scanner-overlay .scan-line {
+            position: absolute;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, transparent, #3b82f6, transparent);
+            box-shadow: 0 0 10px #3b82f6, 0 0 20px #3b82f6;
+            animation: scan-anim 3s linear infinite;
+            border-radius: 3px;
+        }
+
+        @keyframes scan-anim {
+            0% { top: 5%; }
+            50% { top: 95%; }
+            100% { top: 5%; }
+        }
+
+        .scanner-overlay .corner {
+            position: absolute;
+            width: 25px;
+            height: 25px;
+            border-style: solid;
+            border-color: #ffffffaa;
+            border-radius: 2px;
+        }
+        .scanner-overlay .top-left { top: 10px; left: 10px; border-width: 4px 0 0 4px; }
+        .scanner-overlay .top-right { top: 10px; right: 10px; border-width: 4px 4px 0 0; }
+        .scanner-overlay .bottom-left { bottom: 10px; left: 10px; border-width: 0 0 4px 4px; }
+        .scanner-overlay .bottom-right { bottom: 10px; right: 10px; border-width: 0 4px 4px 0; }
     </style>
 </head>
 <body class="bg-zinc-900 text-gray-200">
 
+    <!-- Modal Backdrop -->
+    <div id="modal-backdrop" class="fixed inset-0 bg-gray-900 bg-opacity-80 z-40 hidden"></div>
+
     <!-- QR Scanner Modal -->
-    <div id="qr-scanner-modal" class="fixed inset-0 bg-gray-900 bg-opacity-80 flex-col items-center justify-center z-50 hidden p-4">
-        <div class="w-full max-w-sm bg-white p-4 rounded-lg">
-            <div id="qr-reader" class="w-full"></div>
+    <div id="qr-scanner-modal" class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 hidden flex flex-col items-center gap-4">
+        <div class="w-full max-w-xl bg-black p-2 rounded-lg border border-blue-500/50 shadow-2xl shadow-blue-500/20">
+            <div class="scanner-container">
+                <div id="qr-reader"></div>
+                <div class="scanner-overlay">
+                    <div class="scan-line"></div>
+                    <div class="corner top-left"></div>
+                    <div class="corner top-right"></div>
+                    <div class="corner bottom-left"></div>
+                    <div class="corner bottom-right"></div>
+                </div>
+            </div>
         </div>
-        <button id="close-scanner-button" class="mt-4 bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg font-semibold">Cancel</button>
+        <button id="close-scanner-button" class="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg font-semibold">Cancel</button>
     </div>
 
     <!-- Hero Section -->
@@ -207,8 +360,8 @@
                                 <button id="copy-link-button" class="w-full mt-2 bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-md transition duration-200">Copy Link</button>
                             </div>
                             <div id="qr-output" class="output-content">
-                                <div class="qr-container">
-                                    <div class="bg-white p-2 rounded-md inline-block shadow-lg shadow-blue-500/20">
+                                <div class="futuristic-qr-container">
+                                    <div class="qr-canvas-wrapper">
                                         <canvas id="qr-canvas"></canvas>
                                     </div>
                                     <div id="qr-status" class="text-xs text-blue-300 mt-4 text-center"></div>
@@ -268,18 +421,48 @@
             <div class="text-center max-w-2xl mx-auto mb-16">
                 <h2 class="text-3xl md:text-4xl font-bold text-white">Frequently Asked Questions</h2>
             </div>
-            <div class="max-w-3xl mx-auto space-y-8">
-                <div class="bg-gray-800/50 p-6 rounded-lg border border-gray-700">
-                    <h3 class="text-lg font-semibold text-white mb-2">Is this really secure?</h3>
-                    <p class="text-gray-400">Yes. CryptaShare uses AES-256, a military-grade encryption standard. The entire encryption and decryption process happens locally in your web browser. Your private key (password) and your files are never sent to any server, ensuring complete privacy.</p>
+            <div class="max-w-3xl mx-auto space-y-4" id="faq-container">
+                <!-- FAQ Item 1 -->
+                <div class="faq-item bg-gray-800/50 rounded-lg border border-gray-700">
+                    <h3 class="text-lg font-semibold text-white">
+                        <button class="faq-trigger flex justify-between items-center w-full text-left p-6">
+                            <span>Is this really secure?</span>
+                            <svg class="faq-icon w-5 h-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                            </svg>
+                        </button>
+                    </h3>
+                    <div class="faq-answer">
+                        <p class="text-gray-400 px-6 pb-6">Yes. CryptaShare uses AES-256, a military-grade encryption standard. The entire encryption and decryption process happens locally in your web browser. Your private key (password) and your files are never sent to any server, ensuring complete privacy.</p>
+                    </div>
                 </div>
-                <div class="bg-gray-800/50 p-6 rounded-lg border border-gray-700">
-                    <h3 class="text-lg font-semibold text-white mb-2">Where is my file stored?</h3>
-                    <p class="text-gray-400">For "Long Links", your encrypted file data is encoded directly into the link itself. For "Short Links / QR Codes", the encrypted data is stored temporarily on a secure Supabase server. In both cases, we never see your unencrypted file or your password.</p>
+                <!-- FAQ Item 2 -->
+                <div class="faq-item bg-gray-800/50 rounded-lg border border-gray-700">
+                    <h3 class="text-lg font-semibold text-white">
+                        <button class="faq-trigger flex justify-between items-center w-full text-left p-6">
+                            <span>Where is my file stored?</span>
+                            <svg class="faq-icon w-5 h-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                            </svg>
+                        </button>
+                    </h3>
+                    <div class="faq-answer">
+                         <p class="text-gray-400 px-6 pb-6">For "Long Links", your encrypted file data is encoded directly into the link itself. For "Short Links / QR Codes", the encrypted data is stored temporarily on a secure Supabase server. In both cases, we never see your unencrypted file or your password.</p>
+                    </div>
                 </div>
-                <div class="bg-gray-800/50 p-6 rounded-lg border border-gray-700">
-                    <h3 class="text-lg font-semibold text-white mb-2">Is there a file size limit?</h3>
-                    <p class="text-gray-400">For "Long Links", very large files (>100MB) can create URLs that are too long for some browsers. For "Short Links", the limit is much higher and depends on the backend service's free plan (usually several hundred MB).</p>
+                <!-- FAQ Item 3 -->
+                <div class="faq-item bg-gray-800/50 rounded-lg border border-gray-700">
+                    <h3 class="text-lg font-semibold text-white">
+                        <button class="faq-trigger flex justify-between items-center w-full text-left p-6">
+                            <span>Is there a file size limit?</span>
+                             <svg class="faq-icon w-5 h-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                            </svg>
+                        </button>
+                    </h3>
+                    <div class="faq-answer">
+                        <p class="text-gray-400 px-6 pb-6">For "Long Links", very large files (>100MB) can create URLs that are too long for some browsers. For "Short Links", the limit is much higher and depends on the backend service's free plan (usually several hundred MB).</p>
+                    </div>
                 </div>
             </div>
         </div>
@@ -327,6 +510,7 @@
         const scanQrButton = document.getElementById('scan-qr-button');
         const qrScannerModal = document.getElementById('qr-scanner-modal');
         const closeScannerButton = document.getElementById('close-scanner-button');
+        const modalBackdrop = document.getElementById('modal-backdrop');
 
         let encryptFile = null;
         let decryptFile = null;
@@ -336,6 +520,7 @@
         let html5QrCode;
 
         // --- Supabase Configuration ---
+        // IMPORTANT: Replace with your own Supabase project URL and Anon Key
         const supabaseUrl = 'https://dbfgplgvlydlpoawgoti.supabase.co';
         const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRiZmdwbGd2bHlkbHBvYXdnb3RpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM2NDg4NjUsImV4cCI6MjA2OTIyNDg2NX0.44_XsWIc8UVim0i87jumIqbXG0GaJ3hEs_5zrEewvdw';
 
@@ -422,7 +607,7 @@
             element.innerHTML = `<div class="flex items-center justify-center ${colorClass}">${spinner}<span>${message}</span></div>`;
         }
         
-        // --- New Feature: Password Strength ---
+        // --- Password Strength ---
         function checkPasswordStrength(password) {
             let score = 0;
             if (!password) {
@@ -458,7 +643,7 @@
             checkPasswordStrength(e.target.value);
         });
 
-        // --- New Feature: Scroll Animations ---
+        // --- Scroll Animations ---
         const observer = new IntersectionObserver((entries) => {
             entries.forEach(entry => {
                 if (entry.isIntersecting) {
@@ -765,9 +950,10 @@
 
         // --- QR Scanner Logic ---
         scanQrButton.addEventListener('click', () => {
+            modalBackdrop.style.display = 'block';
             qrScannerModal.style.display = 'flex';
             if (!html5QrCode) {
-                html5QrCode = new Html5Qrcode("qr-reader");
+                html5QrCode = new Html5Qrcode("qr-reader", { formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE] });
             }
             const qrCodeSuccessCallback = (decodedText, decodedResult) => {
                 stopScanner();
@@ -779,7 +965,7 @@
                 .catch(err => {
                     console.error("QR Scanner failed to start.", err);
                     showStatus(decryptStatus, 'Could not start QR scanner.', 'error');
-                    qrScannerModal.style.display = 'none';
+                    stopScanner();
                 });
         });
 
@@ -787,16 +973,50 @@
             if (html5QrCode && html5QrCode.isScanning) {
                 html5QrCode.stop().then(() => {
                     qrScannerModal.style.display = 'none';
+                    modalBackdrop.style.display = 'none';
                 }).catch(err => {
                     console.error("Failed to stop QR scanner.", err);
                     qrScannerModal.style.display = 'none';
+                    modalBackdrop.style.display = 'none';
                 });
             } else {
                 qrScannerModal.style.display = 'none';
+                modalBackdrop.style.display = 'none';
             }
         }
 
         closeScannerButton.addEventListener('click', stopScanner);
+        modalBackdrop.addEventListener('click', stopScanner);
+
+        // --- FAQ Accordion Logic ---
+        document.addEventListener('DOMContentLoaded', () => {
+            const faqContainer = document.getElementById('faq-container');
+
+            if (faqContainer) {
+                faqContainer.addEventListener('click', (e) => {
+                    const trigger = e.target.closest('.faq-trigger');
+                    
+                    if (!trigger) return;
+
+                    const faqItem = trigger.closest('.faq-item');
+                    const answer = faqItem.querySelector('.faq-answer');
+                    const icon = trigger.querySelector('.faq-icon');
+                    
+                    // Close all other open FAQs
+                    faqContainer.querySelectorAll('.faq-answer.is-open').forEach(openAnswer => {
+                        if (openAnswer !== answer) {
+                            openAnswer.classList.remove('is-open');
+                            const openIcon = openAnswer.closest('.faq-item').querySelector('.faq-icon');
+                            if(openIcon) openIcon.classList.remove('is-open');
+                        }
+                    });
+
+                    // Toggle the clicked FAQ item
+                    answer.classList.toggle('is-open');
+                    if(icon) icon.classList.toggle('is-open');
+                });
+            }
+        });
     </script>
 </body>
 </html>
